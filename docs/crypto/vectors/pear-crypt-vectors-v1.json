@@ -1,0 +1,129 @@
+{
+  "specVersion": "1.0.0",
+  "productVersion": "0.9.3",
+  "description": "Deterministic pear-crypt test vectors. All secrets are synthetic.",
+  "fixtures": {
+    "masterKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "wrapSaltHex": "0123456789abcdef0123456789abcdef",
+    "ivHex": "0102030405060708090a0b0c",
+    "shareKeyHex": "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+    "fileUid": "vector-file-uid-001",
+    "metaUid": "vector-meta-uid-001",
+    "sharePublicId": "vector-share-public-001",
+    "wrapPassword": "vector-wrap-password",
+    "demoPassword": "vector-demo-pin",
+    "bindAt": 42,
+    "recoveryCode": "ABCDE-FGHJK-LMNPR-STUVW",
+    "recoveryCodeNormalized": "ABCDEFGHJKLMNPRSTUVW"
+  },
+  "vectors": {
+    "encoding": {
+      "base64": {
+        "inputHex": "000102faff",
+        "output": "AAEC+v8="
+      },
+      "base64Url": {
+        "inputHex": "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+        "output": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+        "roundtripHex": "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f"
+      },
+      "base64Roundtrip": {
+        "inputHex": "000102faff"
+      }
+    },
+    "fileBlob": {
+      "plaintextUtf8": "hello pear-keep",
+      "bindAt": 42,
+      "ciphertextHex": "020102030405060708090a0b0c01217a7dabbee1131a8922c16c01f29dc5a316391c2cc8158a0f8ff5abde2c",
+      "decryptedUtf8": "hello pear-keep"
+    },
+    "metadata": {
+      "plaintext": {
+        "label": "Secret name",
+        "tags": "work",
+        "extension": "pdf",
+        "type": "application/pdf"
+      },
+      "bindAt": 42,
+      "ciphertextBase64": "AgECAwQFBgcICQoLDBcAKyKQxHR9LPaawOnqZao/ZgPXjfgwZ849G2dOM7N8DwXSW+ZMCxKeovCtruuMlyTbgPblPoCx3dZD2JgpItKbBVE+MBg/RxhioSWjtddrXPASIZ3jcltx4YiLPJmG7Q==",
+      "decrypted": {
+        "label": "Secret name",
+        "tags": "work",
+        "extension": "pdf",
+        "type": "application/pdf"
+      }
+    },
+    "shareEnvelope": {
+      "filename": "vector.pdf",
+      "mime": "application/pdf",
+      "plaintextHex": "255044462d312e3420766563746f72",
+      "shareUrlFragment": "#k=EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "ciphertextHex": "010102030405060708090a0b0c0d7b9cc0224b24a12bfdb940fd05bd894c3bc9568474cb4421c26783906562039b4daf68fa358d41978b05ce889b9861b6a288c0211ff22c0f14f36ebb9bcae9368e9fe0068e720f2c8f021412376f4fdaa945",
+      "decrypted": {
+        "filename": "vector.pdf",
+        "mime": "application/pdf",
+        "plaintextHex": "255044462d312e3420766563746f72"
+      }
+    },
+    "masterKeyWrap": {
+      "pbkdf2Legacy": {
+        "password": "vector-wrap-password",
+        "saltBase64": "ASNFZ4mrze8BI0VniavN7w==",
+        "payload": {
+          "v": 1,
+          "iv": "AQIDBAUGBwgJCgsM",
+          "data": "TuHWJF49Ebu9HAyr35NV+NQKFQCj9y0a9i1+J+qEdyNRZfYdp7smzUo9lxcMy2V2"
+        },
+        "unwrappedMasterKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      },
+      "argon2idModern": {
+        "password": "vector-wrap-password",
+        "saltBase64": "ASNFZ4mrze8BI0VniavN7w==",
+        "payload": {
+          "v": 2,
+          "kdf": {
+            "alg": "argon2id",
+            "m": 32768,
+            "t": 2,
+            "p": 1
+          },
+          "iv": "AQIDBAUGBwgJCgsM",
+          "data": "rY1do/0rsVm/85F/ldztrua6P/YorR5M1YJ/Y2YTKem2VRnzlM1+esgXTsoEL4zx"
+        },
+        "unwrappedMasterKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      },
+      "fullWrapRoundtrip": {
+        "keySalt": "ASNFZ4mrze8BI0VniavN7w==",
+        "wrappedMasterKey": {
+          "v": 2,
+          "kdf": {
+            "alg": "argon2id",
+            "m": 32768,
+            "t": 2,
+            "p": 1
+          },
+          "iv": "ASNFZ4mrze8BI0Vn",
+          "data": "XLIsVY0vxjNkmUjrXrSiFTwOB/+LunJZacEPp5ciVIU6wZlmPCHHUonhVDfVvx8k"
+        },
+        "unwrappedMasterKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      }
+    },
+    "demoSandbox": {
+      "plaintext": "pear-keep vector demo",
+      "password": "vector-demo-pin",
+      "wirePrefix": "pk1.",
+      "ciphertext": "pk1.AQEjRWeJq83vASNFZ4mrze8BAgMEBQYHCAkKCwzeLgN5UBGikGyqU4Di8FS+NXjAq06RC81XWFYTRBkKi0s5UG/g",
+      "decrypted": "pear-keep vector demo",
+      "repackedCiphertext": "pk1.AQEjRWeJq83vASNFZ4mrze8BAgMEBQYHCAkKCwzeLgN5UBGikGyqU4Di8FS+NXjAq06RC81XWFYTRBkKi0s5UG/g",
+      "unpacked": {
+        "saltHex": "0123456789abcdef0123456789abcdef",
+        "ivHex": "0102030405060708090a0b0c",
+        "dataHex": "de2e03795011a2906caa5380e2f054be3578c0ab4e910bcd5758561344190a8b4b39506fe0"
+      }
+    },
+    "recoveryCode": {
+      "input": "ABCDE-FGHJK-LMNPR-STUVW",
+      "normalized": "ABCDEFGHJKLMNPRSTUVW"
+    }
+  }
+}
