@@ -22,9 +22,9 @@ export const FIXTURE_WRAP_PASSWORD = 'vector-wrap-password';
 
 export const FIXTURE_DEMO_PASSWORD = 'vector-demo-pin';
 
-export const FIXTURE_DEMO_PLAINTEXT = 'pear-keep vector demo';
+export const FIXTURE_DEMO_PLAINTEXT = 'pear-crypt vector demo';
 
-export const FIXTURE_FILE_PLAINTEXT_UTF8 = 'hello pear-keep';
+export const FIXTURE_FILE_PLAINTEXT_UTF8 = 'hello pear-crypt';
 
 export const FIXTURE_BIND_AT = 42;
 

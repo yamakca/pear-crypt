@@ -13,8 +13,8 @@ Vectors закоммичены здесь; при изменении `src/`:
 npm run export:vectors
 ```
 
-У потребителя (pear-keep): `cd frontend && npm run export:vectors` — тот же JSON, contract test в обоих репозиториях.
-
 **Live demo:** [pear-crypt-demo](../../../pear-crypt-demo/) — `npm install && npm run dev` (рядом нужен checkout `pear-crypt`).
 
-**Tests:** `npm test` — unit tests + contract test против committed vectors. Обновить JSON: `npm run export:vectors`.
+**Tests:** `npm test` — unit tests + contract test против committed vectors.
+
+Префиксы `pear-keep-*` в wire-format — исторические имена протокола v1; менять их нельзя без миграции данных.

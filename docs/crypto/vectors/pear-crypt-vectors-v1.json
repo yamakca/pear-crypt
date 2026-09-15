@@ -32,10 +32,10 @@
       }
     },
     "fileBlob": {
-      "plaintextUtf8": "hello pear-keep",
+      "plaintextUtf8": "hello pear-crypt",
       "bindAt": 42,
-      "ciphertextHex": "020102030405060708090a0b0c01217a7dabbee1131a8922c16c01f29dc5a316391c2cc8158a0f8ff5abde2c",
-      "decryptedUtf8": "hello pear-keep"
+      "ciphertextHex": "020102030405060708090a0b0c01217a7dabbee1131a8922c97b1df2e089050c2121bb9d5e75adae5910bdfbd4",
+      "decryptedUtf8": "hello pear-crypt"
     },
     "metadata": {
       "plaintext": {
@@ -96,29 +96,29 @@
         "keySalt": "ASNFZ4mrze8BI0VniavN7w==",
         "wrappedMasterKey": {
           "v": 2,
+          "iv": "ASNFZ4mrze8BI0Vn",
+          "data": "XLIsVY0vxjNkmUjrXrSiFTwOB/+LunJZacEPp5ciVIU6wZlmPCHHUonhVDfVvx8k",
           "kdf": {
             "alg": "argon2id",
             "m": 32768,
             "t": 2,
             "p": 1
-          },
-          "iv": "ASNFZ4mrze8BI0Vn",
-          "data": "XLIsVY0vxjNkmUjrXrSiFTwOB/+LunJZacEPp5ciVIU6wZlmPCHHUonhVDfVvx8k"
+          }
         },
         "unwrappedMasterKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
       }
     },
     "demoSandbox": {
-      "plaintext": "pear-keep vector demo",
+      "plaintext": "pear-crypt vector demo",
       "password": "vector-demo-pin",
       "wirePrefix": "pk1.",
-      "ciphertext": "pk1.AQEjRWeJq83vASNFZ4mrze8BAgMEBQYHCAkKCwzeLgN5UBGikGyqU4Di8FS+NXjAq06RC81XWFYTRBkKi0s5UG/g",
-      "decrypted": "pear-keep vector demo",
-      "repackedCiphertext": "pk1.AQEjRWeJq83vASNFZ4mrze8BAgMEBQYHCAkKCwzeLgN5UBGikGyqU4Di8FS+NXjAq06RC81XWFYTRBkKi0s5UG/g",
+      "ciphertext": "pk1.AQEjRWeJq83vASNFZ4mrze8BAgMEBQYHCAkKCwzeLgN5UBm1jGz+BZPk50+jZzzBo0xobRDA5PUPmavCGjxGqUYIZw==",
+      "decrypted": "pear-crypt vector demo",
+      "repackedCiphertext": "pk1.AQEjRWeJq83vASNFZ4mrze8BAgMEBQYHCAkKCwzeLgN5UBm1jGz+BZPk50+jZzzBo0xobRDA5PUPmavCGjxGqUYIZw==",
       "unpacked": {
         "saltHex": "0123456789abcdef0123456789abcdef",
         "ivHex": "0102030405060708090a0b0c",
-        "dataHex": "de2e03795011a2906caa5380e2f054be3578c0ab4e910bcd5758561344190a8b4b39506fe0"
+        "dataHex": "de2e03795019b58c6cfe0593e4e74fa3673cc1a34c686d10c0e4f50f99abc21a3c46a9460867"
       }
     },
     "recoveryCode": {
