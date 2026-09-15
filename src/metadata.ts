@@ -84,7 +84,7 @@ export async function decryptFileMetadata(
       ciphertext,
     );
   } catch {
-    throw cryptoError('invalidEncryptedMetadataFormat');
+    throw cryptoError('cannotDecryptMetadata');
   }
 
   try {

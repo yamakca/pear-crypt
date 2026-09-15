@@ -37,7 +37,9 @@ describe('keys and metadata', () => {
     expect(decrypted.label).toBe('Secret name');
     expect(decrypted.tags).toBe('work');
 
-    await expect(decryptFileMetadata(masterKey, uid, cipher, 99)).rejects.toThrow();
+    await expect(decryptFileMetadata(masterKey, uid, cipher, 99)).rejects.toMatchObject({
+      code: 'cannotDecryptMetadata',
+    });
   });
 
   it('accepts legacy metadata plaintext with JSON null optional fields', async () => {

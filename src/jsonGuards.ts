@@ -134,17 +134,13 @@ export function parseFileMetadataPlaintext(value: unknown): FileMetadataPlaintex
   return metadata;
 }
 
-/** Treat JSON `null` like omitted — older clients wrote `"extension":null` etc. */
+/** Treat JSON `null` / wrong types like omitted — older clients were sloppy. */
 function optionalString(value: unknown): string | undefined {
   if (value === undefined || value === null) {
     return undefined;
   }
 
-  if (typeof value !== 'string') {
-    throw cryptoError('invalidEncryptedMetadataFormat');
-  }
-
-  return value;
+  return typeof value === 'string' ? value : undefined;
 }
 
 function optionalFiniteNumber(value: unknown): number | undefined {
@@ -152,9 +148,16 @@ function optionalFiniteNumber(value: unknown): number | undefined {
     return undefined;
   }
 
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw cryptoError('invalidEncryptedMetadataFormat');
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
   }
 
-  return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
 }

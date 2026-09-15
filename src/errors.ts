@@ -2,6 +2,7 @@ export const CryptoErrorCode = {
   invalidMasterKey: 'invalidMasterKey',
   invalidEncryptedFileFormat: 'invalidEncryptedFileFormat',
   invalidEncryptedMetadataFormat: 'invalidEncryptedMetadataFormat',
+  cannotDecryptMetadata: 'cannotDecryptMetadata',
   corruptRecoveryData: 'corruptRecoveryData',
   invalidRecoveryCode: 'invalidRecoveryCode',
   corruptServerE2eeData: 'corruptServerE2eeData',
