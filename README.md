@@ -2,6 +2,8 @@
 
 Client-side encryption: master key wrap, file blobs, metadata, share envelopes.
 
+MIT License — see [LICENSE](./LICENSE).
+
 | | |
 |---|---|
 | **Spec** | [docs/crypto/SPEC.md](./docs/crypto/SPEC.md) |
