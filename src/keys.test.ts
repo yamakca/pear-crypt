@@ -40,6 +40,45 @@ describe('keys and metadata', () => {
     await expect(decryptFileMetadata(masterKey, uid, cipher, 99)).rejects.toThrow();
   });
 
+  it('accepts legacy metadata plaintext with JSON null optional fields', async () => {
+    const { masterKey } = await createE2eeSetup('password-123');
+    const uid = 'meta-nulls';
+    const { encodeBlobAad } = await import('./blobCore.ts');
+    const { bytesToBase64, concatBytes } = await import('./encoding.ts');
+    const { E2EE_BLOB_VERSION } = await import('./constants.ts');
+    const metaKey = await deriveMetadataKey(masterKey, uid);
+    const iv = new Uint8Array(12);
+    const plaintext = new TextEncoder().encode(JSON.stringify({
+      label: 'No extension',
+      tags: null,
+      comments: null,
+      extension: null,
+      marker: null,
+      type: 'application/octet-stream',
+      contentUpdatedAt: null,
+      contentDigest: null,
+    }));
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv,
+        additionalData: encodeBlobAad('pear-keep-meta', uid, 0),
+      },
+      metaKey,
+      plaintext,
+    ));
+    const cipher = bytesToBase64(concatBytes([
+      new Uint8Array([E2EE_BLOB_VERSION]),
+      iv,
+      ciphertext,
+    ]));
+
+    await expect(decryptFileMetadata(masterKey, uid, cipher)).resolves.toEqual({
+      label: 'No extension',
+      type: 'application/octet-stream',
+    });
+  });
+
   it('unwraps master key with recovery code', async () => {
     const { masterKey, material, recoveryCode } = await createE2eeSetup('password-123');
 

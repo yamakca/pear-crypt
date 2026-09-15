@@ -96,61 +96,65 @@ export function parseFileMetadataPlaintext(value: unknown): FileMetadataPlaintex
 
   const metadata: FileMetadataPlaintext = { label: value.label };
 
-  if (value.tags !== undefined) {
-    if (typeof value.tags !== 'string') {
-      throw cryptoError('invalidEncryptedMetadataFormat');
-    }
-
-    metadata.tags = value.tags;
+  const tags = optionalString(value.tags);
+  if (tags !== undefined) {
+    metadata.tags = tags;
   }
 
-  if (value.comments !== undefined) {
-    if (typeof value.comments !== 'string') {
-      throw cryptoError('invalidEncryptedMetadataFormat');
-    }
-
-    metadata.comments = value.comments;
+  const comments = optionalString(value.comments);
+  if (comments !== undefined) {
+    metadata.comments = comments;
   }
 
-  if (value.extension !== undefined) {
-    if (typeof value.extension !== 'string') {
-      throw cryptoError('invalidEncryptedMetadataFormat');
-    }
-
-    metadata.extension = value.extension;
+  const extension = optionalString(value.extension);
+  if (extension !== undefined) {
+    metadata.extension = extension;
   }
 
-  if (value.marker !== undefined) {
-    if (typeof value.marker !== 'string') {
-      throw cryptoError('invalidEncryptedMetadataFormat');
-    }
-
-    metadata.marker = value.marker;
+  const marker = optionalString(value.marker);
+  if (marker !== undefined) {
+    metadata.marker = marker;
   }
 
-  if (value.type !== undefined) {
-    if (typeof value.type !== 'string') {
-      throw cryptoError('invalidEncryptedMetadataFormat');
-    }
-
-    metadata.type = value.type;
+  const type = optionalString(value.type);
+  if (type !== undefined) {
+    metadata.type = type;
   }
 
-  if (value.contentUpdatedAt !== undefined) {
-    if (typeof value.contentUpdatedAt !== 'number') {
-      throw cryptoError('invalidEncryptedMetadataFormat');
-    }
-
-    metadata.contentUpdatedAt = value.contentUpdatedAt;
+  const contentUpdatedAt = optionalFiniteNumber(value.contentUpdatedAt);
+  if (contentUpdatedAt !== undefined) {
+    metadata.contentUpdatedAt = contentUpdatedAt;
   }
 
-  if (value.contentDigest !== undefined) {
-    if (typeof value.contentDigest !== 'string') {
-      throw cryptoError('invalidEncryptedMetadataFormat');
-    }
-
-    metadata.contentDigest = value.contentDigest;
+  const contentDigest = optionalString(value.contentDigest);
+  if (contentDigest !== undefined) {
+    metadata.contentDigest = contentDigest;
   }
 
   return metadata;
+}
+
+/** Treat JSON `null` like omitted — older clients wrote `"extension":null` etc. */
+function optionalString(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value !== 'string') {
+    throw cryptoError('invalidEncryptedMetadataFormat');
+  }
+
+  return value;
+}
+
+function optionalFiniteNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw cryptoError('invalidEncryptedMetadataFormat');
+  }
+
+  return value;
 }
