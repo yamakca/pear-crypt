@@ -1,0 +1,4 @@
+coverage
+node_modules
+docs/crypto/vectors
+package-lock.json

@@ -7,10 +7,12 @@ export {
 
 export * from './constants.ts';
 export * from './encoding.ts';
-export * from './keyMaterial.ts';
-export * from './keys.ts';
-export * from './blobCore.ts';
-export * from './metadata.ts';
-export * from './shareEnvelope.ts';
-export * from './recovery.ts';
-export * from './demoTextCrypto.ts';
+
+export * from './keys/index.ts';
+export * from './wire/blobFrame.ts';
+export * from './files/blob.ts';
+export * from './metadata/metadata.ts';
+export * from './share/envelope.ts';
+export * from './recovery/code.ts';
+export * from './recovery/envelope.ts';
+export * from './demo/textCrypto.ts';

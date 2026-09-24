@@ -14,7 +14,7 @@ export const CryptoErrorCode = {
   invalidShareEnvelope: 'invalidShareEnvelope',
 } as const;
 
-export type CryptoErrorCode = typeof CryptoErrorCode[keyof typeof CryptoErrorCode];
+export type CryptoErrorCode = (typeof CryptoErrorCode)[keyof typeof CryptoErrorCode];
 
 export class PearKeepCryptoError extends Error {
   readonly code: CryptoErrorCode;
@@ -34,5 +34,9 @@ export function isPearKeepCryptoError(
   error: unknown,
   code?: CryptoErrorCode,
 ): error is PearKeepCryptoError {
-  return error instanceof PearKeepCryptoError && (code === undefined || error.code === code);
+  const isCryptoError = error instanceof PearKeepCryptoError;
+  const isCodeUnspecified = code === undefined;
+  const isSameCode = isCryptoError && error.code === code;
+
+  return isCryptoError && (isCodeUnspecified || isSameCode);
 }

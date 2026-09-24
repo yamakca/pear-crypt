@@ -10,7 +10,9 @@ export function bytesToBase64(bytes: Uint8Array): string {
 }
 
 export function base64ToBytes(value: string): Uint8Array {
-  if (typeof value !== 'string' || value.trim() === '') {
+  const isNotString = typeof value !== 'string';
+  const isBlank = !isNotString && value.trim() === '';
+  if (isNotString || isBlank) {
     throw cryptoError('invalidEncoding');
   }
 
@@ -35,12 +37,15 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
 }
 
 export function base64UrlToBytes(value: string): Uint8Array {
-  if (typeof value !== 'string' || value.trim() === '') {
+  const isNotString = typeof value !== 'string';
+  const isBlank = !isNotString && value.trim() === '';
+  if (isNotString || isBlank) {
     throw cryptoError('invalidEncoding');
   }
 
   const normalized = value.trim().replace(/-/g, '+').replace(/_/g, '/');
   const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+
   return base64ToBytes(padded);
 }
 

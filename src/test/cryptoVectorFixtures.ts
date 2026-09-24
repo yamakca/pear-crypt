@@ -32,7 +32,8 @@ export const FIXTURE_RECOVERY_CODE = 'ABCDE-FGHJK-LMNPR-STUVW';
 
 export function hexToBytes(hex: string): Uint8Array {
   const normalized = hex.replace(/\s/g, '');
-  if (normalized.length % 2 !== 0) {
+  const hasOddLength = normalized.length % 2 !== 0;
+  if (hasOddLength) {
     throw new Error('invalid hex');
   }
 
@@ -45,33 +46,31 @@ export function hexToBytes(hex: string): Uint8Array {
 }
 
 export function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /** Queue for crypto.getRandomValues — each call fills the target buffer from the next chunk. */
 export function withFixedRandom<T>(chunks: Uint8Array[], run: () => Promise<T>): Promise<T> {
   const original = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
-  const queue = chunks.map(chunk => new Uint8Array(chunk));
+  const queue = chunks.map((chunk) => new Uint8Array(chunk));
 
-  globalThis.crypto.getRandomValues = (<T extends ArrayBufferView | null>(target: T): T => {
-    if (target === null) {
+  globalThis.crypto.getRandomValues = <T extends ArrayBufferView | null>(target: T): T => {
+    const isTargetMissing = target === null;
+    if (isTargetMissing) {
       return target;
     }
 
-    const view = new Uint8Array(
-      target.buffer,
-      target.byteOffset,
-      target.byteLength,
-    );
+    const view = new Uint8Array(target.buffer, target.byteOffset, target.byteLength);
     const next = queue.shift();
-    if (next) {
+    const hasNextChunk = next !== undefined;
+    if (hasNextChunk) {
       view.set(next.subarray(0, view.length));
     } else {
       original(view);
     }
 
     return target;
-  }) as typeof globalThis.crypto.getRandomValues;
+  };
 
   return run().finally(() => {
     globalThis.crypto.getRandomValues = original;

@@ -1,11 +1,7 @@
+import { E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID } from '../constants.ts';
 import { cryptoError, isPearKeepCryptoError } from '../errors.ts';
 import { base64ToBytes, bytesToBase64 } from '../encoding.ts';
-import {
-  deriveFileKeyFromRaw,
-  deriveMetadataKeyFromRaw,
-  deriveSettingsKeyFromRaw,
-} from '../keyMaterial.ts';
-import { parseWrappedMasterKeyPayload } from '../jsonGuards.ts';
+import { parseWrappedMasterKeyPayload } from './payload.ts';
 import type { E2eeKeyMaterial, WrappedMasterKeyPayload } from './types.ts';
 import {
   decryptWithKey,
@@ -16,25 +12,17 @@ import {
   isLegacyWrapPayload,
 } from './masterKeyCrypto.ts';
 
-export {
-  exportMasterKeyRaw,
-  generateMasterKey,
-  generateSalt,
-  importMasterKeyRaw,
-  isLegacyWrapPayload,
-} from './masterKeyCrypto.ts';
-
-export { parseWrappedMasterKeyPayload } from '../jsonGuards.ts';
-
 function readWrappedMasterKeyPayload(wrappedMasterKey: string): WrappedMasterKeyPayload {
-  if (wrappedMasterKey.trim() === '') {
+  const isWrappedKeyBlank = wrappedMasterKey.trim() === '';
+  if (isWrappedKeyBlank) {
     throw cryptoError('corruptServerE2eeData');
   }
 
   try {
     return parseWrappedMasterKeyPayload(JSON.parse(wrappedMasterKey));
   } catch (error) {
-    if (isPearKeepCryptoError(error, 'corruptServerE2eeData')) {
+    const isCorruptServerData = isPearKeepCryptoError(error, 'corruptServerE2eeData');
+    if (isCorruptServerData) {
       throw error;
     }
 
@@ -46,9 +34,9 @@ export async function wrapMasterKey(
   masterKey: CryptoKey,
   password: string,
   salt: Uint8Array,
-): Promise<{ keySalt: string, wrappedMasterKey: string }> {
+): Promise<{ keySalt: string; wrappedMasterKey: string }> {
   const passwordKey = await deriveWrapKey(password, salt, {
-    v: 2,
+    v: E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID,
     kdf: undefined,
   });
   const raw = await exportMasterKeyRaw(masterKey);
@@ -64,7 +52,9 @@ export async function unwrapMasterKey(
   password: string,
   material: E2eeKeyMaterial,
 ): Promise<CryptoKey> {
-  if (!material.keySalt?.trim() || !material.wrappedMasterKey?.trim()) {
+  const hasKeySalt = Boolean(material.keySalt?.trim());
+  const hasWrappedMasterKey = Boolean(material.wrappedMasterKey?.trim());
+  if (!hasKeySalt || !hasWrappedMasterKey) {
     throw cryptoError('corruptServerE2eeData');
   }
 
@@ -76,11 +66,13 @@ export async function unwrapMasterKey(
 
     return importMasterKeyRaw(raw);
   } catch (error) {
-    if (isPearKeepCryptoError(error, 'corruptServerE2eeData')) {
+    const isCorruptServerData = isPearKeepCryptoError(error, 'corruptServerE2eeData');
+    if (isCorruptServerData) {
       throw error;
     }
 
-    if (isPearKeepCryptoError(error, 'invalidEncoding')) {
+    const isBadEncoding = isPearKeepCryptoError(error, 'invalidEncoding');
+    if (isBadEncoding) {
       throw cryptoError('corruptServerE2eeData');
     }
 
@@ -94,21 +86,6 @@ export function wrappedMasterKeyNeedsKdfUpgrade(wrappedMasterKey: string): boole
   } catch {
     return false;
   }
-}
-
-export async function deriveFileKey(masterKey: CryptoKey, uid: string): Promise<CryptoKey> {
-  const raw = await exportMasterKeyRaw(masterKey);
-  return deriveFileKeyFromRaw(raw, uid);
-}
-
-export async function deriveMetadataKey(masterKey: CryptoKey, uid: string): Promise<CryptoKey> {
-  const raw = await exportMasterKeyRaw(masterKey);
-  return deriveMetadataKeyFromRaw(raw, uid);
-}
-
-export async function deriveSettingsKey(masterKey: CryptoKey): Promise<CryptoKey> {
-  const raw = await exportMasterKeyRaw(masterKey);
-  return deriveSettingsKeyFromRaw(raw);
 }
 
 export async function rewrapMasterKey(

@@ -4,43 +4,30 @@
 **Реализация:** [`src/`](../../src/)  
 **Test vectors:** [pear-crypt-vectors-v1.json](./vectors/pear-crypt-vectors-v1.json)
 
-Документ описывает wire-format и криптографию **на клиенте**. Сервер хранит только ciphertext и метаданные синхронизации; расшифровка возможна только с master key или share key, которые сервер не получает.
+Документ описывает wire-format и криптографию библиотеки. Ciphertext не содержит master key, пароль, PIN, recovery code и share key. Эти секреты остаются у вызывающего кода и используются только как вход KDF или AES-GCM.
 
 ---
 
-## 1. Threat model (честно)
+## 1. Что защищает формат
 
-### Сервер не видит (при включённом E2EE)
+- Содержимое файла и JSON метаданных шифруются отдельными ключами, выведенными из master key.
+- Master key попадает наружу только внутри AES-GCM-обёртки. Ключ обёртки выводится из пароля, PIN или recovery code.
+- Share-конверт шифруется отдельным случайным share key, не связанным с master key.
+- Константа `E2EE_PLACEHOLDER_LABEL` (`—`) — метка, которую вызывающий код может хранить вместо открытого имени.
 
-- Содержимое файлов (blob ciphertext).
-- Расшифрованные метаданные (имя, теги, комментарии) — на сервере placeholder `—`.
-- Master key сейфа — только в обёртке (wrapped), ключ обёртки выводится из секрета пользователя локально.
-- Share key — передаётся в фрагменте URL `#k=…`, который **не отправляется** на сервер при HTTP-запросе.
-
-### Сервер видит
-
-- Ciphertext файлов и share-blob'ов.
-- `publicId` share-ссылки, срок (TTL), факт отзыва.
-- Метаданные синхронизации: uid, размер, timestamps, `e2ee_version`, зашифрованный metadata blob.
-- **Пароль входа** — может проверяться на сервере (не zero-knowledge login).
-- **Публичные страницы** хост-приложения и сторонняя аналитика — вне scope E2EE blob'ов.
-
-### Вне scope этого документа
-
-- API auth, billing, rate limits бэкенда.
-- Локальная сессия браузера (unlock, lockout) — UX-политика потребителя, не wire-format ciphertext на сервере.
+Библиотека не хранит ciphertext и секреты между вызовами.
 
 ---
 
 ## 2. Примитивы
 
-| Примитив | Параметры |
-|----------|-----------|
-| Symmetric | AES-256-GCM |
-| KDF (legacy wrap) | PBKDF2-HMAC-SHA256, **600 000** итераций |
-| KDF (modern wrap) | Argon2id: **m=32768 KiB**, **t=2**, **p=1**, hash **32** bytes |
-| Key derivation (subkeys) | HKDF-SHA256, salt = empty, `info` = UTF-8 scope string |
-| Random | `crypto.getRandomValues` (salt 16 B, IV 12 B) |
+| Примитив                 | Параметры                                                      |
+| ------------------------ | -------------------------------------------------------------- |
+| Symmetric                | AES-256-GCM                                                    |
+| KDF (legacy wrap)        | PBKDF2-HMAC-SHA256, **600 000** итераций                       |
+| KDF (modern wrap)        | Argon2id: **m=32768 KiB**, **t=2**, **p=1**, hash **32** bytes |
+| Key derivation (subkeys) | HKDF-SHA256, salt = empty, `info` = UTF-8 scope string         |
+| Random                   | `crypto.getRandomValues` (salt 16 B, IV 12 B)                  |
 
 Константы — `src/constants.ts`.
 
@@ -50,18 +37,18 @@
 
 - 256-bit AES-GCM key (`E2EE_MASTER_KEY_BYTES = 32`).
 - Генерируется на клиенте при включении E2EE.
-- **Не** отправляется на сервер в открытом виде.
+- В открытом виде из библиотеки наружу не отдаётся: только wrap и производные ключи.
 
-### 3.1 Обёртка master key (на сервере)
+### 3.1 Обёртка master key
 
-Поля аккаунта (`E2eeKeyMaterial`):
+`E2eeKeyMaterial`:
 
-| Поле | Формат |
-|------|--------|
-| `key_salt` | base64, 16 bytes |
-| `wrapped_master_key` | JSON string (см. ниже) |
-| `key_version` | `1` = wrap от пароля аккаунта; `2` = wrap от PIN сейфа |
-| `recovery_wrapped_master_key` | JSON string (см. §7) |
+| Поле                       | Формат                                  |
+| -------------------------- | --------------------------------------- |
+| `keySalt`                  | base64, 16 bytes                        |
+| `wrappedMasterKey`         | JSON string (см. ниже)                  |
+| `keyVersion`               | `1` = wrap от пароля; `2` = wrap от PIN |
+| `recoveryWrappedMasterKey` | JSON string (см. §7), необязательное    |
 
 **WrappedMasterKeyPayload** (JSON):
 
@@ -74,17 +61,17 @@
 }
 ```
 
-| `v` | KDF для ключа обёртки |
-|-----|------------------------|
-| `1` (legacy) | PBKDF2 600k |
+| `v`          | KDF для ключа обёртки                    |
+| ------------ | ---------------------------------------- |
+| `1` (legacy) | PBKDF2 600k                              |
 | `2` (modern) | Argon2id (параметры в `kdf` или default) |
 
 Шифрование: AES-GCM, **без AAD**, plaintext = raw master key (32 bytes).
 
-Секрет обёртки:
+Секрет обёртки библиотека не хранит. Вызывающий код передаёт его в `wrapMasterKey` / `unwrapMasterKey`:
 
-- `key_version=1` — пароль аккаунта (проверяется на сервере при логине, но для unwrap используется локально).
-- `key_version=2` — **PIN сейфа** (цифры, 6–12 для новых; legacy 4+); **не отправляется на сервер**.
+- `keyVersion = 1` (`E2EE_WRAP_VERSION_ACCOUNT`) — пароль.
+- `keyVersion = 2` (`E2EE_WRAP_VERSION_VAULT`) — PIN. Константы длины: новые PIN 6–12 цифр, legacy от 4. Библиотека эти длины не проверяет.
 
 ---
 
@@ -92,14 +79,15 @@
 
 Из raw master key (32 B) через HKDF-SHA256 (`info` = scope, salt пустой):
 
-| Scope | `info` string | Назначение |
-|-------|---------------|------------|
-| File blob | `pear-keep-file:{uid}` | Содержимое файла |
-| Metadata | `pear-keep-meta:{uid}` | JSON метаданных |
-| Settings | `pear-keep-settings` | Зашифрованные user settings |
-| Search index | `pear-keep-search:{uid}` | Зашифрованный индекс поиска (опционально у потребителя) |
+| Scope     | `info` string          | Функция             |
+| --------- | ---------------------- | ------------------- |
+| File blob | `pear-keep-file:{uid}` | `deriveFileKey`     |
+| Metadata  | `pear-keep-meta:{uid}` | `deriveMetadataKey` |
+| Settings  | `pear-keep-settings`   | `deriveSettingsKey` |
 
-`uid` — стабильный идентификатор файла/папки на клиенте.
+Префиксы `pear-keep-*` — исторические имена wire-format v1. `uid` передаёт вызывающий код.
+
+`encodeBlobAad` дополнительно принимает scope `pear-keep-search`. Отдельного формата поискового индекса в библиотеке нет.
 
 ---
 
@@ -111,16 +99,15 @@
 [version: u8][iv: 12 bytes][ciphertext || gcm_tag: variable]
 ```
 
-| version | AAD при decrypt |
-|---------|-----------------|
-| `1` (`E2EE_BLOB_VERSION_LEGACY`) | **нет** (legacy) |
-| `2` (`E2EE_BLOB_VERSION`) | `pear-keep-file:{uid}:{bindAt}` UTF-8 |
+| version                          | AAD при decrypt                       |
+| -------------------------------- | ------------------------------------- |
+| `1` (`E2EE_BLOB_VERSION_LEGACY`) | **нет** (legacy)                      |
+| `2` (`E2EE_BLOB_VERSION`)        | `pear-keep-file:{uid}:{bindAt}` UTF-8 |
 
-- `bindAt` — Unix ms «привязки» содержимого (`contentUpdatedAt`); metadata-only `updatedAt` не ломает decrypt.
-- Пустой plaintext → пустой blob (без шифрования).
+- `bindAt` — число, которое вызывающий код подставляет в AAD. Для метаданных это обычно `contentUpdatedAt`.
+- Пустой plaintext → пустой blob, без шифрования.
 - Overhead: `1 + 12 + 16` bytes (`E2EE_BLOB_OVERHEAD`).
-
-**Remote content type:** `application/x-pear-keep-e2ee-v1`
+- Content type константы: `application/x-pear-keep-e2ee-v1` (`E2EE_CONTENT_TYPE`).
 
 ---
 
@@ -139,15 +126,13 @@
   "comments": "optional string",
   "extension": "optional string",
   "marker": "optional string",
-  "type": "optional mime or inode/directory",
+  "type": "optional string",
   "contentUpdatedAt": "optional number",
   "contentDigest": "optional hex digest"
 }
 ```
 
-На сервере при `e2ee_version >= 2` поле `label` = `—` (`E2EE_PLACEHOLDER_LABEL`).
-
-Хранение: base64 от binary payload.
+Хранение у вызывающего кода: base64 от binary payload. Открытую подпись библиотека не кладёт в ciphertext; для неё есть `E2EE_PLACEHOLDER_LABEL`.
 
 ---
 
@@ -164,11 +149,11 @@
 }
 ```
 
-Секрет KDF = normalized recovery code. **Не** хранится на сервере в открытом виде.
+Секрет KDF = normalized recovery code. В конверт попадает только salt и wrapped payload.
 
 ---
 
-## 8. Share link («Поделиться»)
+## 8. Share envelope
 
 ### 8.1 Ключ
 
@@ -177,7 +162,7 @@
 
 Пример fragment (test vector): `#k=EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8`
 
-### 8.2 Ciphertext на сервере
+### 8.2 Ciphertext
 
 Binary layout:
 
@@ -199,7 +184,7 @@ Binary layout:
 { "filename": "…", "mime": "application/pdf" }
 ```
 
-Share key **не** равен PIN сейфа и **не** derived от master key.
+Share key не выводится из master key и не равен PIN обёртки.
 
 ---
 
@@ -209,63 +194,57 @@ Share key **не** равен PIN сейфа и **не** derived от master key
 
 - Prefix: `pk1.`
 - Base64 binary: `[ver=1][salt 16][iv 12][ciphertext+tag]`
-- KDF: PBKDF2 600k (как legacy wrap), **не** Argon2id.
-- Пароль demo — локальный PIN; **не** логин и **не** отправляется на сервер.
+- KDF: PBKDF2 600k, как legacy wrap, не Argon2id.
 
-См. `src/demoTextCrypto.ts`. Интерактивная проверка: репозиторий **pear-crypt-demo** (`npm run dev`). В проде файлы шифруются master key (§5), не demo password.
-
----
-
-## 10. User settings (кратко)
-
-Binary как §5, version 2, AAD `pear-keep-settings:__pear_keep_user_settings__:{bindAt}`, ключ HKDF scope `pear-keep-settings`. JSON schema настроек — у потребителя библиотеки.
+Код: `src/demo/textCrypto.ts`. Файлы и метаданные этим форматом не шифруются.
 
 ---
 
-## 11. Кодирование
+## 10. Кодирование
 
 - **base64:** standard, `btoa`/`atob` semantics.
 - **base64url:** без `=`, `-`/`_`; см. test vector `encoding.base64Url`.
 
 ---
 
-## 12. Test vectors
+## 11. Test vectors
 
 Файл [vectors/pear-crypt-vectors-v1.json](./vectors/pear-crypt-vectors-v1.json) содержит **синтетические** секреты и детерминированные ciphertext (IV зафиксирован в генераторе).
 
-| Секция | Проверяет |
-|--------|-----------|
-| `encoding` | base64 / base64url |
-| `fileBlob` | §5 encrypt/decrypt |
-| `metadata` | §6 |
-| `shareEnvelope` | §8 |
+| Секция          | Проверяет                                              |
+| --------------- | ------------------------------------------------------ |
+| `encoding`      | base64 / base64url                                     |
+| `fileBlob`      | §5 encrypt/decrypt                                     |
+| `metadata`      | §6                                                     |
+| `shareEnvelope` | §8                                                     |
 | `masterKeyWrap` | PBKDF2 legacy + Argon2id modern + full `wrapMasterKey` |
-| `demoSandbox` | §9 |
-| `recoveryCode` | нормализация |
+| `demoSandbox`   | §9                                                     |
+| `recoveryCode`  | нормализация                                           |
 
-При изменении `src/` обновите vectors в этом репозитории и прогоните contract test у потребителя (если есть).
-
----
-
-## 13. Соответствие реализации
-
-| Spec | Код |
-|------|-----|
-| §3–4 | `src/keys/*`, `keyMaterial.ts` |
-| §5 | `src/blobCore.ts` |
-| §6 | `src/metadata.ts` |
-| §7 | `src/recovery.ts`, `keys/e2eeSetup.ts` |
-| §8 | `src/shareEnvelope.ts` |
-| §9 | `src/demoTextCrypto.ts` |
-
-Ошибки — `PearKeepCryptoError` с машинными кодами; локализация — у потребителя.
+После изменения `src/`: `npm run export:vectors`, затем `npm test`.
 
 ---
 
-## 14. Changelog spec
+## 12. Соответствие реализации
 
-| Version | Change |
-|---------|--------|
-| 1.0.0 | Initial spec + vectors |
-| 1.1.0 | Error codes instead of i18n in library |
-| 1.2.0 | Spec + vectors in `docs/crypto/` |
+| Spec | Код                                          |
+| ---- | -------------------------------------------- |
+| §3–4 | `src/keys/`                                  |
+| §5   | `src/files/blob.ts`, `src/wire/blobFrame.ts` |
+| §6   | `src/metadata/metadata.ts`                   |
+| §7   | `src/recovery/`, `src/keys/e2eeSetup.ts`     |
+| §8   | `src/share/envelope.ts`                      |
+| §9   | `src/demo/textCrypto.ts`                     |
+| §10  | `src/encoding.ts`                            |
+
+Ошибки — `PearKeepCryptoError` с машинным кодом в `code`. Текст сообщения равен коду.
+
+---
+
+## 13. Changelog spec
+
+| Version | Change                                 |
+| ------- | -------------------------------------- |
+| 1.0.0   | Initial spec + vectors                 |
+| 1.1.0   | Error codes instead of i18n in library |
+| 1.2.0   | Spec + vectors in `docs/crypto/`       |

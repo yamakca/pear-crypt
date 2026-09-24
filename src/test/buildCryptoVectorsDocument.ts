@@ -72,12 +72,17 @@ export async function buildCryptoVectorsDocument(): Promise<CryptoVectorsDocumen
   );
 
   const metadataCipher = await withFixedRandom([fixedIv], () =>
-    encryptFileMetadata(masterKey, FIXTURE_META_UID, {
-      label: 'Secret name',
-      tags: 'work',
-      extension: 'pdf',
-      type: 'application/pdf',
-    }, FIXTURE_BIND_AT),
+    encryptFileMetadata(
+      masterKey,
+      FIXTURE_META_UID,
+      {
+        label: 'Secret name',
+        tags: 'work',
+        extension: 'pdf',
+        type: 'application/pdf',
+      },
+      FIXTURE_BIND_AT,
+    ),
   );
   const metadataDecrypted = await decryptFileMetadata(
     masterKey,
@@ -94,11 +99,7 @@ export async function buildCryptoVectorsDocument(): Promise<CryptoVectorsDocumen
       bytes: sharePdfBytes,
     }),
   );
-  const shareDecrypted = await decryptShareEnvelope(
-    shareKey,
-    FIXTURE_SHARE_PUBLIC_ID,
-    shareBlob,
-  );
+  const shareDecrypted = await decryptShareEnvelope(shareKey, FIXTURE_SHARE_PUBLIC_ID, shareBlob);
 
   const pbkdf2WrapKey = await derivePasswordKey(FIXTURE_WRAP_PASSWORD, wrapSalt);
   const pbkdf2Payload = await withFixedRandom([fixedIv], () =>

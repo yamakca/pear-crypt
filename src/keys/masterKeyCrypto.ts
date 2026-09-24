@@ -1,6 +1,9 @@
 import { argon2id } from 'hash-wasm';
 import { cryptoError } from '../errors.ts';
+import { requireSubtleCrypto } from '../webCrypto.ts';
 import {
+  AES_GCM_IV_BYTES,
+  AES_GCM_KEY_BITS,
   E2EE_ARGON2_HASH_LENGTH,
   E2EE_ARGON2_ITERATIONS,
   E2EE_ARGON2_MEMORY_KIB,
@@ -15,11 +18,7 @@ import { base64ToBytes, bytesToBase64 } from '../encoding.ts';
 import type { WrappedMasterKeyPayload, WrapKdfParams } from './types.ts';
 
 export function getSubtleCrypto(): SubtleCrypto {
-  if (!globalThis.crypto?.subtle) {
-    throw cryptoError('webCryptoUnavailableBrowser');
-  }
-
-  return globalThis.crypto.subtle;
+  return requireSubtleCrypto('webCryptoUnavailableBrowser');
 }
 
 export function generateSalt(): Uint8Array {
@@ -39,17 +38,14 @@ async function importAesGcmKey(raw: Uint8Array): Promise<CryptoKey> {
   return getSubtleCrypto().importKey(
     'raw',
     raw,
-    { name: 'AES-GCM', length: 256 },
+    { name: 'AES-GCM', length: AES_GCM_KEY_BITS },
     false,
     ['encrypt', 'decrypt'],
   );
 }
 
 /** Legacy wrap derivation (payload v1). */
-export async function derivePasswordKey(
-  password: string,
-  salt: Uint8Array,
-): Promise<CryptoKey> {
+export async function derivePasswordKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const subtle = getSubtleCrypto();
   const passwordKey = await subtle.importKey(
     'raw',
@@ -67,7 +63,7 @@ export async function derivePasswordKey(
       hash: 'SHA-256',
     },
     passwordKey,
-    { name: 'AES-GCM', length: 256 },
+    { name: 'AES-GCM', length: AES_GCM_KEY_BITS },
     false,
     ['encrypt', 'decrypt'],
   );
@@ -96,10 +92,12 @@ export async function deriveWrapKey(
   salt: Uint8Array,
   payload: Pick<WrappedMasterKeyPayload, 'v' | 'kdf'>,
 ): Promise<CryptoKey> {
-  if (payload.v === E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID) {
-    const params = payload.kdf?.alg === 'argon2id'
-      ? payload.kdf
-      : defaultArgon2KdfParams();
+  const isArgon2idWrap = payload.v === E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID;
+  if (isArgon2idWrap) {
+    const hasArgon2idParams = payload.kdf?.alg === 'argon2id';
+    const params =
+      hasArgon2idParams && payload.kdf !== undefined ? payload.kdf : defaultArgon2KdfParams();
+
     return deriveArgon2idKey(password, salt, params);
   }
 
@@ -107,77 +105,83 @@ export async function deriveWrapKey(
 }
 
 export async function generateMasterKey(): Promise<CryptoKey> {
-  return getSubtleCrypto().generateKey(
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt'],
-  );
+  return getSubtleCrypto().generateKey({ name: 'AES-GCM', length: AES_GCM_KEY_BITS }, true, [
+    'encrypt',
+    'decrypt',
+  ]);
 }
 
 export async function exportMasterKeyRaw(masterKey: CryptoKey): Promise<Uint8Array> {
   const raw = await getSubtleCrypto().exportKey('raw', masterKey);
+
   return new Uint8Array(raw);
 }
 
 export async function importMasterKeyRaw(raw: Uint8Array): Promise<CryptoKey> {
-  if (raw.byteLength !== E2EE_MASTER_KEY_BYTES) {
+  const isMasterKeyLengthWrong = raw.byteLength !== E2EE_MASTER_KEY_BYTES;
+  if (isMasterKeyLengthWrong) {
     throw cryptoError('invalidMasterKey');
   }
 
   return getSubtleCrypto().importKey(
     'raw',
     raw,
-    { name: 'AES-GCM', length: 256 },
+    { name: 'AES-GCM', length: AES_GCM_KEY_BITS },
     true,
     ['encrypt', 'decrypt'],
   );
 }
 
-export async function encryptWithKey(key: CryptoKey, plaintext: Uint8Array): Promise<WrappedMasterKeyPayload> {
-  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await getSubtleCrypto().encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    plaintext,
-  );
-  const kdf = defaultArgon2KdfParams();
-
-  return {
-    v: E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID,
-    kdf,
+async function sealWithKey(
+  key: CryptoKey,
+  plaintext: Uint8Array,
+  version: number,
+  kdf?: WrapKdfParams,
+): Promise<WrappedMasterKeyPayload> {
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES));
+  const ciphertext = await getSubtleCrypto().encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+  const payload: WrappedMasterKeyPayload = {
+    v: version,
     iv: bytesToBase64(iv),
     data: bytesToBase64(new Uint8Array(ciphertext)),
   };
+
+  const hasKdf = kdf !== undefined;
+  if (hasKdf) {
+    payload.kdf = kdf;
+  }
+
+  return payload;
+}
+
+export async function encryptWithKey(
+  key: CryptoKey,
+  plaintext: Uint8Array,
+): Promise<WrappedMasterKeyPayload> {
+  return sealWithKey(key, plaintext, E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID, defaultArgon2KdfParams());
 }
 
 /** Encrypt with an already-derived key and force legacy PBKDF2 payload shape (tests / migration helpers). */
-export async function encryptWithKeyLegacy(key: CryptoKey, plaintext: Uint8Array): Promise<WrappedMasterKeyPayload> {
-  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await getSubtleCrypto().encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    plaintext,
-  );
-
-  return {
-    v: E2EE_WRAP_PAYLOAD_VERSION_PBKDF2,
-    iv: bytesToBase64(iv),
-    data: bytesToBase64(new Uint8Array(ciphertext)),
-  };
+export async function encryptWithKeyLegacy(
+  key: CryptoKey,
+  plaintext: Uint8Array,
+): Promise<WrappedMasterKeyPayload> {
+  return sealWithKey(key, plaintext, E2EE_WRAP_PAYLOAD_VERSION_PBKDF2);
 }
 
-export async function decryptWithKey(key: CryptoKey, payload: WrappedMasterKeyPayload): Promise<Uint8Array> {
+export async function decryptWithKey(
+  key: CryptoKey,
+  payload: WrappedMasterKeyPayload,
+): Promise<Uint8Array> {
   const iv = base64ToBytes(payload.iv);
   const ciphertext = base64ToBytes(payload.data);
-  const plaintext = await getSubtleCrypto().decrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    ciphertext,
-  );
+  const plaintext = await getSubtleCrypto().decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
 
   return new Uint8Array(plaintext);
 }
 
 export function isLegacyWrapPayload(payload: WrappedMasterKeyPayload): boolean {
-  return payload.v !== E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID;
+  const isArgon2idWrap = payload.v === E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID;
+
+  return !isArgon2idWrap;
 }

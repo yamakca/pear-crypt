@@ -1,4 +1,4 @@
-import type { FileMetadataPlaintext } from '../metadata.ts';
+import type { FileMetadataPlaintext } from '../metadata/metadata.ts';
 import type { WrappedMasterKeyPayload } from '../keys/types.ts';
 
 export interface CryptoVectorFixtures {
@@ -26,8 +26,8 @@ export interface CryptoVectorsDocument {
 
 export interface CryptoVectorsSection {
   encoding: {
-    base64: { inputHex: string, output: string };
-    base64Url: { inputHex: string, output: string, roundtripHex: string };
+    base64: { inputHex: string; output: string };
+    base64Url: { inputHex: string; output: string; roundtripHex: string };
     base64Roundtrip: { inputHex: string };
   };
   fileBlob: {
@@ -93,19 +93,27 @@ export interface CryptoVectorsSection {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  const isObject = typeof value === 'object';
+  const isNotNull = value !== null;
+
+  return isObject && isNotNull;
 }
 
 function isString(value: unknown): value is string {
-  return typeof value === 'string';
+  const isText = typeof value === 'string';
+
+  return isText;
 }
 
 function isNumber(value: unknown): value is number {
-  return typeof value === 'number';
+  const isNumeric = typeof value === 'number';
+
+  return isNumeric;
 }
 
 function assertRecord(value: unknown, label: string): Record<string, unknown> {
-  if (!isRecord(value)) {
+  const isObject = isRecord(value);
+  if (!isObject) {
     throw new Error(`invalid crypto vectors: ${label}`);
   }
 
@@ -114,7 +122,8 @@ function assertRecord(value: unknown, label: string): Record<string, unknown> {
 
 function requireString(record: Record<string, unknown>, key: string): string {
   const value = record[key];
-  if (!isString(value)) {
+  const isText = isString(value);
+  if (!isText) {
     throw new Error(`invalid crypto vectors: fixtures.${key}`);
   }
 
@@ -123,7 +132,8 @@ function requireString(record: Record<string, unknown>, key: string): string {
 
 function requireNumber(record: Record<string, unknown>, key: string): number {
   const value = record[key];
-  if (!isNumber(value)) {
+  const isNumeric = isNumber(value);
+  if (!isNumeric) {
     throw new Error(`invalid crypto vectors: fixtures.${key}`);
   }
 
@@ -161,7 +171,8 @@ function parseVectorsSection(value: Record<string, unknown>): CryptoVectorsSecti
   ] as const;
 
   for (const key of requiredSections) {
-    if (!isRecord(value[key])) {
+    const isSectionObject = isRecord(value[key]);
+    if (!isSectionObject) {
       throw new Error(`invalid crypto vectors: vectors.${key}`);
     }
   }
@@ -172,16 +183,30 @@ function parseVectorsSection(value: Record<string, unknown>): CryptoVectorsSecti
 export function parseCryptoVectorsDocument(value: unknown): CryptoVectorsDocument {
   const root = assertRecord(value, 'root');
 
-  if (!isString(root.specVersion) || !isString(root.productVersion) || !isString(root.description)) {
+  const specVersion = root.specVersion;
+  const hasSpecVersion = isString(specVersion);
+  if (!hasSpecVersion) {
+    throw new Error('invalid crypto vectors: header');
+  }
+
+  const productVersion = root.productVersion;
+  const hasProductVersion = isString(productVersion);
+  if (!hasProductVersion) {
+    throw new Error('invalid crypto vectors: header');
+  }
+
+  const description = root.description;
+  const hasDescription = isString(description);
+  if (!hasDescription) {
     throw new Error('invalid crypto vectors: header');
   }
 
   const vectors = assertRecord(root.vectors, 'vectors');
 
   return {
-    specVersion: root.specVersion,
-    productVersion: root.productVersion,
-    description: root.description,
+    specVersion,
+    productVersion,
+    description,
     fixtures: parseFixtures(root.fixtures),
     vectors: parseVectorsSection(vectors),
   };

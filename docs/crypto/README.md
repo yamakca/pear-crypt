@@ -1,9 +1,9 @@
 # Спецификация и test vectors
 
-| Файл | Назначение |
-|------|------------|
-| [SPEC.md](./SPEC.md) | Wire-format, KDF, AAD, threat model |
-| [vectors/pear-crypt-vectors-v1.json](./vectors/pear-crypt-vectors-v1.json) | Детерминированные test vectors |
+| Файл                                                                       | Назначение                          |
+| -------------------------------------------------------------------------- | ----------------------------------- |
+| [SPEC.md](./SPEC.md)                                                       | Wire-format, KDF, AAD, threat model |
+| [vectors/pear-crypt-vectors-v1.json](./vectors/pear-crypt-vectors-v1.json) | Детерминированные test vectors      |
 
 **Код:** [`../../src/`](../../src/)
 

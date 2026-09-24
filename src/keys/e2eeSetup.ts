@@ -1,8 +1,9 @@
 import { cryptoError, isPearKeepCryptoError } from '../errors.ts';
 import { base64ToBytes, bytesToBase64 } from '../encoding.ts';
-import { generateRecoveryCode, normalizeRecoveryCode } from '../recovery.ts';
-import { E2EE_WRAP_VERSION_VAULT } from '../constants.ts';
-import { parseRecoveryWrapEnvelope, parseWrappedMasterKeyPayload } from '../jsonGuards.ts';
+import { generateRecoveryCode, normalizeRecoveryCode } from '../recovery/code.ts';
+import { parseRecoveryWrapEnvelope } from '../recovery/envelope.ts';
+import { E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID, E2EE_WRAP_VERSION_VAULT } from '../constants.ts';
+import { parseWrappedMasterKeyPayload } from './payload.ts';
 import type { E2eeKeyMaterial } from './types.ts';
 import {
   decryptWithKey,
@@ -24,7 +25,7 @@ export async function createRecoveryWrap(masterKey: CryptoKey): Promise<{
   const recoveryPasswordKey = await deriveWrapKey(
     normalizeRecoveryCode(recoveryCode),
     recoverySalt,
-    { v: 2 },
+    { v: E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID },
   );
   const recoveryRaw = await exportMasterKeyRaw(masterKey);
   const recoveryPayload = await encryptWithKey(recoveryPasswordKey, recoveryRaw);
@@ -68,7 +69,8 @@ export async function unwrapMasterKeyWithRecovery(
   recoveryCode: string,
   recoveryWrappedMasterKey: string,
 ): Promise<CryptoKey> {
-  if (recoveryWrappedMasterKey.trim() === '') {
+  const isRecoveryWrapBlank = recoveryWrappedMasterKey.trim() === '';
+  if (isRecoveryWrapBlank) {
     throw cryptoError('corruptRecoveryData');
   }
 
@@ -76,7 +78,8 @@ export async function unwrapMasterKeyWithRecovery(
   try {
     envelope = parseRecoveryWrapEnvelope(JSON.parse(recoveryWrappedMasterKey));
   } catch (error) {
-    if (isPearKeepCryptoError(error, 'corruptRecoveryData')) {
+    const isCorruptRecoveryData = isPearKeepCryptoError(error, 'corruptRecoveryData');
+    if (isCorruptRecoveryData) {
       throw error;
     }
 
@@ -87,16 +90,13 @@ export async function unwrapMasterKeyWithRecovery(
     const salt = base64ToBytes(envelope.salt);
     const payload = parseWrappedMasterKeyPayload(JSON.parse(envelope.wrapped));
 
-    const passwordKey = await deriveWrapKey(
-      normalizeRecoveryCode(recoveryCode),
-      salt,
-      payload,
-    );
+    const passwordKey = await deriveWrapKey(normalizeRecoveryCode(recoveryCode), salt, payload);
     const raw = await decryptWithKey(passwordKey, payload);
 
     return importMasterKeyRaw(raw);
   } catch (error) {
-    if (isPearKeepCryptoError(error, 'corruptRecoveryData')) {
+    const isCorruptRecoveryData = isPearKeepCryptoError(error, 'corruptRecoveryData');
+    if (isCorruptRecoveryData) {
       throw error;
     }
 
