@@ -34,6 +34,13 @@ describe('encoding', () => {
   it('rejects invalid base64 strings', () => {
     expect(() => base64ToBytes('!!!')).toThrow(PearKeepCryptoError);
     expect(() => base64ToBytes('')).toThrow(PearKeepCryptoError);
+    expect(() => base64ToBytes(1 as unknown as string)).toThrow(PearKeepCryptoError);
+    expect(() => base64UrlToBytes(1 as unknown as string)).toThrow(PearKeepCryptoError);
+    expect(() => base64UrlToBytes('A')).toThrow(PearKeepCryptoError);
+
+    const input = new Uint8Array([0]);
+    expect(Array.from(base64ToBytes(`  ${bytesToBase64(input)}  `))).toEqual([0]);
+    expect(Array.from(base64UrlToBytes(`  ${bytesToBase64Url(input)}  `))).toEqual([0]);
 
     try {
       base64ToBytes('!!!');

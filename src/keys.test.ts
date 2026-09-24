@@ -128,6 +128,11 @@ describe('keys and metadata', () => {
     await expect(importMasterKeyRaw(new Uint8Array(4))).rejects.toMatchObject({
       code: 'invalidMasterKey',
     });
+    for (const length of [0, 31, 33]) {
+      await expect(importMasterKeyRaw(new Uint8Array(length))).rejects.toMatchObject({
+        code: 'invalidMasterKey',
+      });
+    }
   });
 
   it('rewraps the master key with a new password', async () => {
@@ -166,6 +171,22 @@ describe('keys and metadata', () => {
     expect(modernPayload.v).toBe(E2EE_WRAP_PAYLOAD_VERSION_ARGON2ID);
     expect(modernPayload.kdf?.alg).toBe('argon2id');
     expect(wrappedMasterKeyNeedsKdfUpgrade(modern.wrappedMasterKey)).toBe(false);
+  });
+
+  it('unwraps an Argon2id payload that omits kdf parameters', async () => {
+    const salt = generateSalt();
+    const masterKey = await generateMasterKey();
+    const wrapped = await wrapMasterKey(masterKey, 'argon-default-kdf', salt);
+    const parsed = parseWrappedMasterKeyPayload(JSON.parse(wrapped.wrappedMasterKey));
+    const withoutKdf = { v: parsed.v, iv: parsed.iv, data: parsed.data };
+
+    const unlocked = await unwrapMasterKey('argon-default-kdf', {
+      keySalt: wrapped.keySalt,
+      wrappedMasterKey: JSON.stringify(withoutKdf),
+      keyVersion: 2,
+    });
+
+    expect(await exportMasterKeyRaw(unlocked)).toEqual(await exportMasterKeyRaw(masterKey));
   });
 
   it('creates a standalone recovery wrap for an existing master key', async () => {
@@ -232,7 +253,7 @@ describe('keys and metadata', () => {
   });
 
   it('rejects a bad recovery envelope and a wrong recovery code', async () => {
-    const { material, recoveryCode } = await createE2eeSetup('password-123');
+    const { masterKey, material, recoveryCode } = await createE2eeSetup('password-123');
 
     await expect(unwrapMasterKeyWithRecovery(recoveryCode, '   ')).rejects.toMatchObject({
       code: 'corruptRecoveryData',
@@ -245,6 +266,14 @@ describe('keys and metadata', () => {
     });
     await expect(
       unwrapMasterKeyWithRecovery('WRONG-CODE', material.recoveryWrappedMasterKey!),
+    ).rejects.toMatchObject({
+      code: 'invalidRecoveryCode',
+    });
+    const mangled = ` ${recoveryCode.toLowerCase()} 01 `;
+    const unlocked = await unwrapMasterKeyWithRecovery(mangled, material.recoveryWrappedMasterKey!);
+    expect(await exportMasterKeyRaw(unlocked)).toEqual(await exportMasterKeyRaw(masterKey));
+    await expect(
+      unwrapMasterKeyWithRecovery('01-', material.recoveryWrappedMasterKey!),
     ).rejects.toMatchObject({
       code: 'invalidRecoveryCode',
     });
@@ -315,6 +344,9 @@ describe('keys and metadata', () => {
       concatBytes([new Uint8Array([E2EE_BLOB_VERSION_LEGACY]), iv, legacy]),
     );
     await expect(decryptFileMetadata(masterKey, 'uid', legacyCipher)).resolves.toEqual({
+      label: 'legacy',
+    });
+    await expect(decryptFileMetadata(masterKey, 'uid', legacyCipher, 999)).resolves.toEqual({
       label: 'legacy',
     });
   });

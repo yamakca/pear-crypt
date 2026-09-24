@@ -36,6 +36,12 @@ describe('recovery codes', () => {
     expect(normalized.slice(0, 5)).not.toBe(normalized.slice(20, 25));
   });
 
+  it('strips lookalikes, case, and separators', () => {
+    expect(normalizeRecoveryCode(' ab-cde01 ')).toBe('ABCDE');
+    expect(normalizeRecoveryCode('oil')).toBe('OIL');
+    expect(normalizeRecoveryCode('01-')).toBe('');
+  });
+
   it('fails when the random source does not return a full buffer', () => {
     vi.spyOn(globalThis.crypto, 'getRandomValues').mockReturnValue([] as unknown as Uint8Array);
 

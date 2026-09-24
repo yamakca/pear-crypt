@@ -91,4 +91,35 @@ describe('json guards', () => {
     );
     expect(() => parseFileMetadataPlaintext('nope')).toThrow('invalidEncryptedMetadataFormat');
   });
+
+  it('keeps a zero timestamp and empty strings', () => {
+    expect(
+      parseFileMetadataPlaintext({
+        label: '',
+        tags: '',
+        contentUpdatedAt: 0,
+      }),
+    ).toEqual({
+      label: '',
+      tags: '',
+      contentUpdatedAt: 0,
+    });
+
+    expect(
+      parseFileMetadataPlaintext({
+        label: 'scan',
+        contentUpdatedAt: Number.NaN,
+      }),
+    ).toEqual({ label: 'scan' });
+
+    expect(
+      parseFileMetadataPlaintext({
+        label: 'scan',
+        contentUpdatedAt: ' 1700 ',
+      }),
+    ).toEqual({
+      label: 'scan',
+      contentUpdatedAt: 1700,
+    });
+  });
 });

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { AES_GCM_IV_BYTES, SHARE_BLOB_VERSION, SHARE_KEY_BYTES } from './constants.ts';
+import {
+  AES_GCM_IV_BYTES,
+  E2EE_BLOB_OVERHEAD,
+  SHARE_BLOB_VERSION,
+  SHARE_KEY_BYTES,
+} from './constants.ts';
 import { packVersionedBlob } from './wire/blobFrame.ts';
 import {
   decryptShareEnvelope,
@@ -34,6 +39,15 @@ describe('shareEnvelope', () => {
     expect((await decryptShareEnvelope(shareKey, 'share-public-1', blankMime)).mime).toBe(
       'application/pdf',
     );
+
+    const emptyBody = await encryptShareEnvelope(shareKey, 'share-public-1', {
+      filename: 'empty.pdf',
+      mime: 'application/pdf',
+      bytes: new Uint8Array(),
+    });
+    const emptyDecrypted = await decryptShareEnvelope(shareKey, 'share-public-1', emptyBody);
+    expect(emptyDecrypted.filename).toBe('empty.pdf');
+    expect(emptyDecrypted.bytes.byteLength).toBe(0);
   });
 
   it('rejects a wrong key, public id, or truncated payload', async () => {
@@ -109,6 +123,83 @@ describe('shareEnvelope', () => {
     const decrypted = await decryptShareEnvelope(shareKey, publicId, await seal(body));
     expect(decrypted.mime).toBe('application/pdf');
     expect(decrypted.filename).toBe('a.pdf');
+
+    const headerNoMime = new TextEncoder().encode(JSON.stringify({ filename: 'a.pdf' }));
+    const noMimePrefix = new Uint8Array(2);
+    new DataView(noMimePrefix.buffer).setUint16(0, headerNoMime.byteLength, false);
+    const noMimeBody = new Uint8Array(noMimePrefix.byteLength + headerNoMime.byteLength);
+    noMimeBody.set(noMimePrefix, 0);
+    noMimeBody.set(headerNoMime, 2);
+    expect((await decryptShareEnvelope(shareKey, publicId, await seal(noMimeBody))).mime).toBe(
+      'application/pdf',
+    );
+  });
+
+  it('rejects an empty filename after sealing', async () => {
+    const shareKey = generateShareKey();
+    for (const filename of ['', '   ']) {
+      const encrypted = await encryptShareEnvelope(shareKey, 'share-empty-name', {
+        filename,
+        mime: 'application/pdf',
+        bytes: new Uint8Array([1]),
+      });
+      await expect(
+        decryptShareEnvelope(shareKey, 'share-empty-name', encrypted),
+      ).rejects.toMatchObject({ code: 'invalidShareEnvelope' });
+    }
+  });
+
+  it('accepts a header of 65535 bytes and rejects 65536', async () => {
+    const shareKey = generateShareKey();
+    const wrapperLength = new TextEncoder().encode(
+      JSON.stringify({ filename: '', mime: 'application/pdf' }),
+    ).byteLength;
+    const atLimit = 'x'.repeat(65535 - wrapperLength);
+    const overLimit = 'x'.repeat(65536 - wrapperLength);
+
+    const encrypted = await encryptShareEnvelope(shareKey, 'share-limit', {
+      filename: atLimit,
+      mime: 'application/pdf',
+      bytes: new Uint8Array([1]),
+    });
+    expect((await decryptShareEnvelope(shareKey, 'share-limit', encrypted)).filename).toBe(atLimit);
+
+    await expect(
+      encryptShareEnvelope(shareKey, 'share-limit', {
+        filename: overLimit,
+        mime: 'application/pdf',
+        bytes: new Uint8Array([1]),
+      }),
+    ).rejects.toMatchObject({ code: 'invalidShareEnvelope' });
+  });
+
+  it('rejects a non-share version and a key that is not 32 bytes', async () => {
+    const shareKey = generateShareKey();
+    const encrypted = await encryptShareEnvelope(shareKey, 'share-a', {
+      filename: 'scan.pdf',
+      mime: 'application/pdf',
+      bytes: new Uint8Array([1]),
+    });
+    const wrongVersion = new Uint8Array(E2EE_BLOB_OVERHEAD);
+    wrongVersion[0] = 2;
+
+    await expect(decryptShareEnvelope(shareKey, 'share-a', wrongVersion)).rejects.toMatchObject({
+      code: 'invalidShareEnvelope',
+    });
+
+    for (const length of [31, 33]) {
+      const key = new Uint8Array(length);
+      await expect(
+        encryptShareEnvelope(key, 'share-a', {
+          filename: 'scan.pdf',
+          mime: 'application/pdf',
+          bytes: new Uint8Array([1]),
+        }),
+      ).rejects.toMatchObject({ code: 'invalidShareKey' });
+      await expect(decryptShareEnvelope(key, 'share-a', encrypted)).rejects.toMatchObject({
+        code: 'invalidShareKey',
+      });
+    }
   });
 
   it('requires Web Crypto when sealing a share', async () => {

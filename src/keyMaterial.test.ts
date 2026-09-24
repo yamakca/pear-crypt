@@ -26,9 +26,11 @@ describe('keyMaterial', () => {
   });
 
   it('rejects invalid master key length', async () => {
-    await expect(deriveFileKeyFromRaw(new Uint8Array(8), 'uid')).rejects.toMatchObject({
-      code: 'invalidMasterKey',
-    });
+    for (const length of [0, 8, 31, 33]) {
+      await expect(deriveFileKeyFromRaw(new Uint8Array(length), 'uid')).rejects.toMatchObject({
+        code: 'invalidMasterKey',
+      });
+    }
   });
 
   it('requires Web Crypto', async () => {
